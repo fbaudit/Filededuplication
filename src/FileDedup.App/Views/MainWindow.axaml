@@ -1,0 +1,260 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:FileDedup.App.ViewModels"
+        x:Class="FileDedup.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Icon="/Assets/icon.ico"
+        Title="FileDedup — 중복 파일 정리 + 고속 검색"
+        Width="1100" Height="750"
+        WindowStartupLocation="CenterScreen">
+
+  <TabControl Margin="8">
+
+    <!-- ═══════════ ① 중복 검사 ═══════════ -->
+    <TabItem Header="중복 검사">
+      <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Margin="4">
+
+        <!-- 대상 폴더 -->
+        <Border Grid.Row="0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,6">
+          <Grid ColumnDefinitions="*,Auto">
+            <ListBox Grid.Column="0" MaxHeight="90"
+                     ItemsSource="{Binding Dedup.Folders}"
+                     SelectedItem="{Binding Dedup.SelectedFolder}" />
+            <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0">
+              <Button Content="폴더 추가" Command="{Binding Dedup.AddFolderCommand}"
+                      HorizontalAlignment="Stretch" />
+              <Button Content="제거" Command="{Binding Dedup.RemoveFolderCommand}"
+                      HorizontalAlignment="Stretch" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <!-- 판별 기준 + 필터 -->
+        <Border Grid.Row="1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,6">
+          <StackPanel Spacing="6">
+            <WrapPanel>
+              <TextBlock Text="중복 판별 기준:" VerticalAlignment="Center" Margin="0,0,10,0"
+                         FontWeight="Bold" />
+              <CheckBox Content="파일명" IsChecked="{Binding Dedup.ByFileName}" Margin="0,0,10,0" />
+              <CheckBox Content="크기" IsChecked="{Binding Dedup.BySize}" Margin="0,0,10,0" />
+              <CheckBox Content="만든일자" IsChecked="{Binding Dedup.ByCreated}" Margin="0,0,10,0" />
+              <CheckBox Content="수정일자" IsChecked="{Binding Dedup.ByModified}" Margin="0,0,10,0" />
+              <CheckBox Content="CRC32" IsChecked="{Binding Dedup.ByCrc32}" Margin="0,0,10,0" />
+              <CheckBox Content="MD5" IsChecked="{Binding Dedup.ByMd5}" Margin="0,0,10,0" />
+              <CheckBox Content="SHA-256" IsChecked="{Binding Dedup.BySha256}" Margin="0,0,10,0" />
+              <CheckBox Content="대소문자 무시" IsChecked="{Binding Dedup.IgnoreCase}" />
+            </WrapPanel>
+            <WrapPanel>
+              <TextBlock Text="제외 패턴(;로 구분):" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBox Text="{Binding Dedup.ExcludePatterns}" Width="220" Margin="0,0,14,0" />
+              <TextBlock Text="최소 크기(KB):" VerticalAlignment="Center" Margin="0,0,6,0" />
+              <TextBox Text="{Binding Dedup.MinSizeKb}" Width="80" Margin="0,0,14,0" />
+              <Button Content="검사 시작" Command="{Binding Dedup.ScanCommand}"
+                      IsEnabled="{Binding !Dedup.IsBusy}" Classes="accent" Margin="0,0,6,0" />
+              <Button Content="취소" Command="{Binding Dedup.CancelCommand}"
+                      IsEnabled="{Binding Dedup.IsBusy}" />
+            </WrapPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- 결과 그룹 -->
+        <ListBox Grid.Row="2" ItemsSource="{Binding Dedup.Groups}"
+                 x:Name="DedupResultsList"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:DuplicateGroupViewModel">
+              <Expander Header="{Binding Header}" IsExpanded="True"
+                        HorizontalAlignment="Stretch">
+                <ItemsControl ItemsSource="{Binding Files}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FileItemViewModel">
+                      <Grid ColumnDefinitions="Auto,*,90,130" Margin="16,1,0,1">
+                        <CheckBox Grid.Column="0" IsChecked="{Binding IsChecked}" />
+                        <TextBlock Grid.Column="1" Text="{Binding FullPath}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip.Tip="{Binding HashText}"
+                                   DoubleTapped="OnDedupFileDoubleTapped" />
+                        <TextBlock Grid.Column="2" Text="{Binding SizeText}"
+                                   VerticalAlignment="Center" HorizontalAlignment="Right" />
+                        <TextBlock Grid.Column="3" Text="{Binding ModifiedText}"
+                                   VerticalAlignment="Center" HorizontalAlignment="Right" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </Expander>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- 자동 선택 + 처리 -->
+        <Border Grid.Row="3" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,6,0,0">
+          <StackPanel Spacing="6">
+            <WrapPanel>
+              <TextBlock Text="자동 선택:" VerticalAlignment="Center" Margin="0,0,6,0"
+                         FontWeight="Bold" />
+              <ComboBox SelectedIndex="{Binding Dedup.KeepPolicyIndex}" Width="180"
+                        Margin="0,0,6,0">
+                <ComboBoxItem Content="최신 파일 보존" />
+                <ComboBoxItem Content="오래된 파일 보존" />
+                <ComboBoxItem Content="짧은 경로 보존" />
+                <ComboBoxItem Content="지정 폴더 우선 보존" />
+              </ComboBox>
+              <Button Content="보존 폴더 선택..." Command="{Binding Dedup.PickPreferredFolderCommand}"
+                      Margin="0,0,6,0" />
+              <TextBlock Text="{Binding Dedup.PreferredFolder}" VerticalAlignment="Center"
+                         Margin="0,0,10,0" Opacity="0.7" TextTrimming="CharacterEllipsis"
+                         MaxWidth="200" />
+              <Button Content="규칙 적용" Command="{Binding Dedup.ApplyRuleCommand}" Margin="0,0,6,0" />
+              <Button Content="선택 해제" Command="{Binding Dedup.ClearSelectionCommand}" />
+            </WrapPanel>
+            <WrapPanel>
+              <TextBlock Text="처리 방식:" VerticalAlignment="Center" Margin="0,0,6,0"
+                         FontWeight="Bold" />
+              <ComboBox SelectedIndex="{Binding Dedup.DisposeMethodIndex}" Width="150"
+                        Margin="0,0,6,0">
+                <ComboBoxItem Content="휴지통으로 이동" />
+                <ComboBoxItem Content="지정 폴더로 이동" />
+                <ComboBoxItem Content="영구 삭제" />
+              </ComboBox>
+              <Button Content="이동 대상 폴더..." Command="{Binding Dedup.PickMoveTargetCommand}"
+                      Margin="0,0,6,0" />
+              <TextBlock Text="{Binding Dedup.MoveTargetFolder}" VerticalAlignment="Center"
+                         Margin="0,0,10,0" Opacity="0.7" TextTrimming="CharacterEllipsis"
+                         MaxWidth="200" />
+              <CheckBox Content="CSV 보고서 저장" IsChecked="{Binding Dedup.WriteReport}"
+                        Margin="0,0,10,0" />
+              <Button Content="선택 파일 처리" Command="{Binding Dedup.ExecuteCommand}"
+                      IsEnabled="{Binding !Dedup.IsBusy}" Classes="accent" />
+            </WrapPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- 상태 표시줄 -->
+        <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="2,6,2,0">
+          <TextBlock Grid.Column="0" Text="{Binding Dedup.StatusText}" />
+          <TextBlock Grid.Column="1" Text="{Binding Dedup.SummaryText}" FontWeight="Bold" />
+        </Grid>
+      </Grid>
+    </TabItem>
+
+    <!-- ═══════════ ② 파일명 검색 ═══════════ -->
+    <TabItem Header="파일명 검색">
+      <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="4">
+        <WrapPanel Grid.Row="0" Margin="0,0,0,6">
+          <Button Content="전체 드라이브 인덱싱 (MFT)" Command="{Binding Search.BuildMftIndexCommand}"
+                  IsEnabled="{Binding !Search.IsBusy}" Margin="0,0,6,0"
+                  IsVisible="{Binding Search.IsMftAvailable}" />
+          <Button Content="폴더 선택 인덱싱" Command="{Binding Search.BuildFolderIndexCommand}"
+                  IsEnabled="{Binding !Search.IsBusy}" Margin="0,0,6,0" />
+          <Button Content="취소" Command="{Binding Search.CancelBuildCommand}"
+                  IsEnabled="{Binding Search.IsBusy}" Margin="0,0,10,0" />
+          <TextBlock Text="{Binding Search.IndexStatus}" VerticalAlignment="Center" Opacity="0.8" />
+        </WrapPanel>
+
+        <TextBox Grid.Row="1" Text="{Binding Search.SearchText}"
+                 Watermark="파일명 검색 — 공백=AND, *.pdf 와일드카드, path:폴더, ext:hwp"
+                 FontSize="15" Margin="0,0,0,6" />
+
+        <DataGrid Grid.Row="2" x:Name="SearchResultsGrid" x:CompileBindings="False"
+                  ItemsSource="{Binding Search.Results}"
+                  IsReadOnly="True" CanUserSortColumns="True"
+                  DoubleTapped="OnSearchResultDoubleTapped">
+          <DataGrid.Columns>
+            <DataGridTextColumn Header="이름" Binding="{Binding Name}" Width="250" />
+            <DataGridTextColumn Header="전체 경로" Binding="{Binding FullPath}" Width="*" />
+            <DataGridTextColumn Header="크기" Binding="{Binding SizeText}" Width="90" />
+            <DataGridTextColumn Header="수정일" Binding="{Binding ModifiedText}" Width="140" />
+          </DataGrid.Columns>
+        </DataGrid>
+
+        <TextBlock Grid.Row="3" Text="{Binding Search.ResultStatus}" Margin="2,6,2,0" />
+      </Grid>
+    </TabItem>
+
+    <!-- ═══════════ ③ 내용 검색 ═══════════ -->
+    <TabItem Header="내용 검색">
+      <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="4">
+        <Border Grid.Row="0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}"
+                BorderThickness="1" CornerRadius="4" Padding="8" Margin="0,0,0,6">
+          <Grid ColumnDefinitions="*,Auto">
+            <ListBox Grid.Column="0" MaxHeight="80"
+                     ItemsSource="{Binding Content.Folders}"
+                     SelectedItem="{Binding Content.SelectedFolder}" />
+            <StackPanel Grid.Column="1" Spacing="4" Margin="8,0,0,0">
+              <Button Content="폴더 추가" Command="{Binding Content.AddFolderCommand}"
+                      HorizontalAlignment="Stretch" />
+              <Button Content="제거" Command="{Binding Content.RemoveFolderCommand}"
+                      HorizontalAlignment="Stretch" />
+              <Button Content="인덱싱 실행" Command="{Binding Content.RunIndexingCommand}"
+                      IsEnabled="{Binding !Content.IsBusy}" HorizontalAlignment="Stretch"
+                      Classes="accent" />
+              <Button Content="취소" Command="{Binding Content.CancelIndexingCommand}"
+                      IsEnabled="{Binding Content.IsBusy}" HorizontalAlignment="Stretch" />
+            </StackPanel>
+          </Grid>
+        </Border>
+
+        <TextBox Grid.Row="1" Text="{Binding Content.SearchText}"
+                 Watermark="문서 내용 검색 — txt / docx / xlsx / pptx / pdf / hwp / hwpx (한국어 부분일치 지원)"
+                 FontSize="15" Margin="0,0,0,6" />
+
+        <ListBox Grid.Row="2" x:Name="ContentResultsList"
+                 ItemsSource="{Binding Content.Results}"
+                 DoubleTapped="OnContentResultDoubleTapped">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:ContentHitViewModel">
+              <StackPanel Margin="2">
+                <TextBlock Text="{Binding FileName}" FontWeight="Bold" />
+                <TextBlock Text="{Binding FullPath}" Opacity="0.6" FontSize="12"
+                           TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Snippet}" Opacity="0.85" FontSize="13"
+                           TextWrapping="Wrap" MaxLines="2" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+
+        <Grid Grid.Row="3" ColumnDefinitions="*,Auto" Margin="2,6,2,0">
+          <TextBlock Grid.Column="0" Text="{Binding Content.IndexStatus}" />
+          <TextBlock Grid.Column="1" Text="{Binding Content.ResultStatus}" FontWeight="Bold" />
+        </Grid>
+      </Grid>
+    </TabItem>
+
+    <!-- ═══════════ ④ 정보 ═══════════ -->
+    <TabItem Header="정보">
+      <ScrollViewer>
+        <StackPanel Margin="16" Spacing="10" MaxWidth="760" HorizontalAlignment="Left">
+          <StackPanel Orientation="Horizontal" Spacing="12">
+            <Image Source="/Assets/icon.png" Width="48" Height="48" />
+            <StackPanel VerticalAlignment="Center">
+              <TextBlock Text="FileDedup" FontSize="22" FontWeight="Bold" />
+              <TextBlock Text="중복 파일 정리 + 고속 검색 (디지털포렌식팀 내부 배포용)" Opacity="0.7" />
+            </StackPanel>
+          </StackPanel>
+
+          <TextBlock FontWeight="Bold" FontSize="16" Text="중복 검사" Margin="0,8,0,0" />
+          <TextBlock TextWrapping="Wrap"
+                     Text="폴더를 추가하고 판별 기준(파일명·크기·만든일자·수정일자·CRC32·MD5·SHA-256)을 조합해 검사합니다. 선택된 기준을 모두 만족하는 파일들이 중복 그룹으로 묶입니다. 해시 기준은 크기 그룹핑 → 선두 64KB 부분해시 → 전체 해시의 3단계로 계산을 최소화합니다. 자동 선택 규칙을 적용해도 그룹당 1개는 항상 보존되며, 처리 전 CSV 보고서(경로·크기·날짜·해시·처리 결과)를 문서 폴더에 저장할 수 있습니다." />
+
+          <TextBlock FontWeight="Bold" FontSize="16" Text="파일명 검색" Margin="0,8,0,0" />
+          <TextBlock TextWrapping="Wrap"
+                     Text="관리자 권한으로 실행하면 NTFS MFT를 직접 읽어 전체 드라이브를 수 초 내에 인덱싱합니다(Everything과 동일 원리). 관리자 권한이 없으면 폴더 선택 인덱싱으로 동작합니다. 검색 문법: 공백은 AND, *·? 와일드카드, path:폴더명, ext:확장자. 파일이 바뀐 뒤에는 인덱싱 버튼으로 다시 읽어 주세요." />
+
+          <TextBlock FontWeight="Bold" FontSize="16" Text="내용 검색" Margin="0,8,0,0" />
+          <TextBlock TextWrapping="Wrap"
+                     Text="지정한 폴더의 문서(txt·log·csv·md·소스코드·docx·xlsx·pptx·pdf·hwp·hwpx)에서 텍스트를 추출해 전문검색 인덱스(SQLite FTS5)를 만듭니다. 한국어 부분일치를 지원하며, 재인덱싱 시 변경된 파일만 갱신됩니다. 스캔 이미지 PDF·암호화 문서는 추출되지 않습니다." />
+
+          <TextBlock FontWeight="Bold" FontSize="16" Text="주의" Margin="0,8,0,0" />
+          <TextBlock TextWrapping="Wrap"
+                     Text="영구 삭제는 복구할 수 없습니다. 기본 설정(휴지통 이동)과 CSV 보고서 저장을 유지한 채 사용하는 것을 권장합니다." />
+        </StackPanel>
+      </ScrollViewer>
+    </TabItem>
+  </TabControl>
+</Window>
