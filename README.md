@@ -42,7 +42,7 @@ DoubleKiller(중복 검사)와 Everything(고속 파일명 검색)을 벤치마�
 ## 소스에서 빌드
 
 ```bash
-dotnet test                                   # 46개 유닛/통합 테스트
+dotnet test                                   # 45개 유닛/통합 테스트
 dotnet publish src/FileDedup.App -c Release -r win-x64 --self-contained \
   -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o publish
 ```
